@@ -1485,6 +1485,24 @@ void Clang::AddMIPSTargetArgs(const ArgList &Args,
       CmdArgs.push_back("-cheri128");
     }
   }
+
+  // Handle the implicit -fpic and TLS quirk of the N64 ABI for MIPS64. This
+  // quirk is that the N64 ABI defaults to pic as static is unreasonable.
+  // Using -fpic explicit generates different (!) results than implicit pic.
+  // N32, being based off / being handled the same as N64 has the same logic.
+  if (ABIName == "n32" || ABIName == "n64") {
+    llvm::Reloc::Model RelocationModel;
+    unsigned PICLevel;
+    bool IsPIE;
+    std::tie(RelocationModel, PICLevel, IsPIE) =
+        ParsePICArgs(getToolChain(), Args);
+
+    if (PICLevel > 0 && !Args.hasArg(options::OPT_fpic) &&
+        !Args.hasArg(options::OPT_fPIC)) {
+      CmdArgs.push_back("-mllvm");
+      CmdArgs.push_back("-moverride-tls-exec-for-pic");
+    }
+  }
 }
 
 void Clang::AddPPCTargetArgs(const ArgList &Args,
